@@ -42,7 +42,7 @@ I built the first two rows.  The last two need infrastructure beyond this exerci
 ## 5. What I built
 
 - One AI call returns category, urgency, confidence and reasoning as validated JSON, at temperature 0.1.
-- Urgency follows the model, backed by rules that force High for outage, lockout, security and double-charge phrases.  Rules skip negated phrases such as "no outage".
+- Urgency follows the model, backed by rules that force High for outage, lockout, security and double-charge phrases.  Rules skip a critical phrase when a negation word sits shortly before it, as in "no outage".  This is a simple safety-net guard, not full negation handling.
 - Praise and feature requests stay Low.  Cancellation threats score at least Medium.
 - Templates and escalation are fixed.  Low-confidence answers go to manual review.
 - The app shows a banner when the keyword fallback produced a result.  The Groq client starts on first use, and the model name is a setting (`VITE_GROQ_MODEL`).
@@ -67,7 +67,7 @@ I built the first two rows.  The last two need infrastructure beyond this exerci
 | Polite thanks, then a team locked out | Technical, High |
 
 The first live run found two flaws, and I fixed both:
-- My outage rule turned "No outage on my end" into High.  The rules now skip negated phrases.
+- My outage rule turned "No outage on my end" into High.  The rules now skip a critical phrase that follows a nearby negation word.
 - "We are cancelling" scored Low.  The prompt now treats a cancellation threat as Medium.
 
 The ambiguous billing and technical message gave the same answer in 5 of 5 runs.
