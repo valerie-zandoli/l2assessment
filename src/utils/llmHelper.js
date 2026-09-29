@@ -1,58 +1,53 @@
 import Groq from 'groq-sdk';
+import { SYSTEM_PROMPT, parseTriageResponse } from './triageParser.js';
 
 /**
  * LLM Helper for categorizing customer support messages
  * Using Groq API for AI-powered categorization
  */
 
-// Initialize Groq client
-const groq = new Groq({
-  apiKey: import.meta.env.VITE_GROQ_API_KEY,
-  dangerouslyAllowBrowser: true // Required for browser-based calls (not recommended for production!)
-});
+// Build the client on first use.  Creating it at import time throws when no API key
+// is set, which crashed the whole app instead of reaching the keyword fallback.
+let groqClient = null;
+function getClient() {
+  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+  if (!apiKey) throw new Error('No VITE_GROQ_API_KEY set');
+  if (!groqClient) {
+    groqClient = new Groq({
+      apiKey,
+      dangerouslyAllowBrowser: true // Required for browser-based calls (not recommended for production!)
+    });
+  }
+  return groqClient;
+}
 
 /**
- * Categorize a customer support message using Groq AI
- * 
+ * Triage a customer support message using Groq AI.
+ * One call returns category, urgency, confidence and reasoning as JSON.
+ * Falls back to keyword rules when the API is unavailable or the reply is malformed.
+ *
  * @param {string} message - The customer support message
- * @returns {Promise<{category: string, reasoning: string}>}
+ * @returns {Promise<{category: string, urgency: string|null, confidence: number, reasoning: string, source: 'ai'|'fallback'}>}
  */
 export async function categorizeMessage(message) {
   try {
-    const response = await groq.chat.completions.create({
+    const response = await getClient().chat.completions.create({
       model: "llama-3.3-70b-versatile",
       messages: [
-        {
-          role: "user",
-          content: `Categorize this customer support message: ${message}`
-        }
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: `Customer message:\n"""\n${message}\n"""` }
       ],
-      temperature: 0.7,
+      temperature: 0.1,
+      response_format: { type: "json_object" },
     });
 
-    const content = response.choices[0].message.content;
-    
-    const lines = content.split('\n');
-    let category = "Unknown";
-    let reasoning = content;
-    
-    if (content.toLowerCase().includes('billing')) {
-      category = "Billing Issue";
-    } else if (content.toLowerCase().includes('technical') || content.toLowerCase().includes('bug')) {
-      category = "Technical Problem";
-    } else if (content.toLowerCase().includes('feature')) {
-      category = "Feature Request";
-    } else if (content.toLowerCase().includes('inquiry') || content.toLowerCase().includes('question')) {
-      category = "General Inquiry";
-    }
-    
-    return {
-      category,
-      reasoning: content
-    };
+    const triage = parseTriageResponse(response.choices[0].message.content);
+    if (!triage) throw new Error('Model reply was not valid triage JSON');
+
+    return { ...triage, source: 'ai' };
   } catch (error) {
     console.warn('Groq API failed, using mock response:', error.message);
-    return getMockCategorization(message);
+    return { ...getMockCategorization(message), urgency: null, confidence: 0.4, source: 'fallback' };
   }
 }
 
@@ -115,7 +110,7 @@ function getMockCategorization(message) {
   // Technical problem detection
   if (lowerMessage.includes('bug') || lowerMessage.includes('error') || 
       lowerMessage.includes('broken') || lowerMessage.includes('not working') ||
-      lowerMessage.includes('crash') || lowerMessage.includes('down') || 
+      lowerMessage.includes('crash') || /\bdown\b/.test(lowerMessage) || lowerMessage.includes('connection') || 
       lowerMessage.includes('server') || lowerMessage.includes('loading') ||
       lowerMessage.includes('slow') || lowerMessage.includes('issue') ||
       lowerMessage.includes('problem') && !lowerMessage.includes('no problem')) {
@@ -141,7 +136,7 @@ function getMockCategorization(message) {
   if ((lowerMessage.includes('thank') || lowerMessage.includes('thanks') || lowerMessage.includes('appreciate')) &&
       !lowerMessage.includes('but') && !lowerMessage.includes('however')) {
     return {
-      category: "General Inquiry",
+      category: "Positive Feedback",
       reasoning: getRandomReasoning('positive')
     };
   }
@@ -157,9 +152,9 @@ function getMockCategorization(message) {
     };
   }
   
-  // Fallback for ambiguous messages
+  // Fallback for ambiguous messages: send to a person rather than guess
   return {
-    category: "General Inquiry",
+    category: "Unknown",
     reasoning: getRandomReasoning('ambiguous')
   };
 }
