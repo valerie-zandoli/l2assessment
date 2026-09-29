@@ -8,6 +8,10 @@ import { SYSTEM_PROMPT, parseTriageResponse } from './triageParser.js';
 
 // Build the client on first use.  Creating it at import time throws when no API key
 // is set, which crashed the whole app instead of reaching the keyword fallback.
+// Groq retires models over time (llama-3.3-70b-versatile now returns 404), so the model
+// name can be overridden with VITE_GROQ_MODEL without a code change.
+const MODEL = import.meta.env.VITE_GROQ_MODEL || "openai/gpt-oss-120b";
+
 let groqClient = null;
 function getClient() {
   const apiKey = import.meta.env.VITE_GROQ_API_KEY;
@@ -32,7 +36,7 @@ function getClient() {
 export async function categorizeMessage(message) {
   try {
     const response = await getClient().chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: MODEL,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: `Customer message:\n"""\n${message}\n"""` }
