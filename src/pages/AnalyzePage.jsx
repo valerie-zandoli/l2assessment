@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { categorizeMessage } from '../utils/llmHelper'
 import { calculateUrgency } from '../utils/urgencyScorer'
-import { getRecommendedAction } from '../utils/templates'
+import { getRecommendedAction, shouldEscalate } from '../utils/templates'
+import { MIN_CONFIDENCE } from '../utils/triageParser'
 
 function AnalyzePage() {
   const [message, setMessage] = useState('')
@@ -28,21 +29,26 @@ function AnalyzePage() {
     setResults(null)
     
     try {
-      // Run categorization (LLM call)
-      const { category, reasoning } = await categorizeMessage(message)
-      
-      // Calculate urgency (rule-based)
-      const urgency = calculateUrgency(message)
-      
-      // Get recommended action (template-based)
-      const recommendedAction = getRecommendedAction(category)
-      
+      // One LLM call returns category, urgency, confidence and reasoning
+      const triage = await categorizeMessage(message)
+
+      // Low-confidence AI answers go to a person instead of an automatic route
+      const needsReview = triage.source === 'ai' && triage.confidence < MIN_CONFIDENCE
+      const category = needsReview ? 'Unknown' : triage.category
+
+      // Rules back up the model on critical phrases and low-stakes categories
+      const urgency = calculateUrgency(message, { category: triage.category, llmUrgency: triage.urgency })
+      const recommendedAction = getRecommendedAction(category, urgency)
+
       const analysisResult = {
         message,
         category,
         urgency,
         recommendedAction,
-        reasoning,
+        reasoning: triage.reasoning,
+        confidence: triage.confidence,
+        source: triage.source,
+        escalate: shouldEscalate(category, urgency),
         timestamp: new Date().toISOString()
       }
 
@@ -128,6 +134,17 @@ function AnalyzePage() {
         {results && (
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Analysis Results</h2>
+
+            {results.source === 'fallback' && (
+              <div role="alert" className="mb-4 rounded-lg border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-900">
+                The AI service was unavailable, so keyword rules produced this result. Please review it before acting.
+              </div>
+            )}
+            {results.escalate && (
+              <div role="alert" className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-900">
+                Escalate to a support lead.
+              </div>
+            )}
             
             <div className="space-y-4">
               <div>
