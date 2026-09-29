@@ -22,6 +22,21 @@ const CRITICAL_PATTERNS = [
   /\b(charged|billed) (me |us )?(twice|two times|again)\b|\bdouble[- ]charged\b/i,
 ]
 
+// "No outage on my end" must not trigger the outage rule.
+const NEGATION_BEFORE = /\b(no|not|never|without|isn'?t|wasn'?t|aren'?t|weren'?t|zero)\b[^.!?,;]{0,20}$/i
+
+// Patterns that already contain their own negation ("can't log in") skip the guard.
+const SELF_NEGATED = /can'?t|cannot|unable|locked out/
+
+function hasCriticalPhrase(message) {
+  return CRITICAL_PATTERNS.some((pattern) => {
+    const match = message.match(pattern)
+    if (!match) return false
+    if (SELF_NEGATED.test(pattern.source)) return true
+    return !NEGATION_BEFORE.test(message.slice(0, match.index + match[0].length))
+  })
+}
+
 const CATEGORY_DEFAULTS = {
   "Billing Issue": "Medium",
   "Technical Problem": "Medium",
@@ -38,9 +53,7 @@ const CATEGORY_DEFAULTS = {
 export function calculateUrgency(message, { category, llmUrgency } = {}) {
   const lowStakes = category === "Positive Feedback" || category === "Feature Request"
 
-  if (!lowStakes && CRITICAL_PATTERNS.some((pattern) => pattern.test(message))) {
-    return "High"
-  }
+  if (!lowStakes && hasCriticalPhrase(message)) return "High"
   if (lowStakes) return "Low"
   if (["High", "Medium", "Low"].includes(llmUrgency)) return llmUrgency
 
