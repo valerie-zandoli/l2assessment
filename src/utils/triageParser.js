@@ -31,7 +31,8 @@ Category rules:
 - General Inquiry is a question about hours, plans, policies or how something works.
 Urgency rules (judge by business impact, never by message length, punctuation or politeness):
 - High: outage, data loss, security problem, customer fully blocked, or money taken wrongly.
-- Medium: a feature is broken or a billing problem exists, but the customer can still work.
+- Medium: a feature is broken or a billing problem exists, but the customer can still work,
+  or the customer says they will cancel or leave.
 - Low: questions, praise, feature requests and anything with no time pressure.
 Use a low confidence when the message is too short or vague to classify.`
 
