@@ -77,3 +77,14 @@ test('parser rejects bad category, bad urgency, bad confidence and non-JSON', ()
 test('parser clamps confidence to 0-1', () => {
   assert.equal(parseTriageResponse(good.replace('0.9', '7')).confidence, 1)
 })
+
+test('negated critical phrases do not force High', () => {
+  for (const msg of ['No outage on my end, just wondering about annual billing', 'The server is not down, I am only asking about plans', 'I was not charged twice, thanks']) {
+    assert.notEqual(calculateUrgency(msg, { category: 'General Inquiry', llmUrgency: 'Low' }), 'High')
+  }
+})
+
+test('negation guard does not hide real outages', () => {
+  assert.equal(calculateUrgency('No idea why, the server is down now', { category: 'Technical Problem', llmUrgency: 'Low' }), 'High')
+  assert.equal(calculateUrgency("We can't log in", { category: 'Technical Problem', llmUrgency: 'Low' }), 'High')
+})
