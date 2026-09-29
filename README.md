@@ -11,7 +11,7 @@ Support teams waste time manually reading and triaging customer messages. This t
 ## Tech Stack
 
 - **Frontend**: React + Vite + Tailwind CSS
-- **AI**: Groq API (Llama 3.3 70B - Free tier)
+- **AI**: Groq API (`openai/gpt-oss-120b` by default, free tier; override with `VITE_GROQ_MODEL`)
 - **Runtime**: Browser-based (local development only)
 
 ## Setup Instructions
@@ -63,8 +63,8 @@ Support teams waste time manually reading and triaging customer messages. This t
 1. **Paste Message**: User pastes a customer support message into the text area
 2. **Analyze**: Click "Analyze Message" to process the input
 3. **Classification**: The app runs three processes in parallel:
-   - **Category Classification** (LLM): Uses Groq AI (Llama 3.3 70B) to categorize the message
-   - **Urgency Scoring** (Rule-based): Applies simple rules to determine urgency
+   - **Category Classification** (LLM): Uses Groq AI to return category, urgency, confidence and reasoning as JSON
+   - **Urgency Scoring** (Model plus rules): Uses the model's urgency call, backed by rules that force High for outages, lockouts, security and double-charge phrases, and cap praise and feature requests at Low
    - **Recommendation** (Template-based): Maps category to a recommended action
 4. **Display Results**: Shows category, urgency tag, recommended action, and AI reasoning
 5. **History**: All analyses are saved to localStorage and viewable in the History tab
@@ -104,6 +104,14 @@ Can I upgrade my subscription to the pro plan?
 The dashboard won't load when I try to access it. I've tried refreshing but it keeps timing out.
 ```
 
+## Tests
+
+```bash
+npm test
+```
+
+Runs 18 unit tests for urgency rules, templates and response parsing with Node's built-in runner.
+
 ## Security Note
 
 ⚠️ **Warning**: This application exposes the Groq API key in the browser (using `dangerouslyAllowBrowser: true`). This is acceptable for local development only but should **NEVER** be done in production. In a real application, API calls should be made from a secure backend server.
@@ -113,7 +121,7 @@ The dashboard won't load when I try to access it. I've tried refreshing but it k
 - ✅ **Completely Free** - No credit card required
 - ✅ **Fast Inference** - Groq's LPU technology is incredibly fast
 - ✅ **Generous Limits** - ~14,400 requests/day on free tier
-- ✅ **High Quality** - Llama 3.3 70B performs excellently
+- ✅ **High Quality** - Open models such as gpt-oss-120b handle triage well
 - ✅ **Easy Signup** - Get started in minutes at https://console.groq.com
 
 ## License
